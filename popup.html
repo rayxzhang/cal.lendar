@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>cal.lendar</title>
+    <style>
+        body {
+            width: 300px;
+            padding: 20px;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background-color: #f8f9fa;
+            margin: 0;
+        }
+        
+        h3 {
+            color: #2c3e50;
+            margin-top: 0;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+        
+        select {
+            width: 100%;
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            background-color: white;
+            color: #495057;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s ease;
+        }
+        
+        select:focus {
+            border-color: #4dabf7;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background-color: #228be6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        
+        button:hover {
+            background-color: #1c7ed6;
+        }
+        
+        button:active {
+            background-color: #1971c2;
+        }
+        
+        .error-message {
+            background-color: #fff5f5;
+            color: #e03131;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ffc9c9;
+            margin-bottom: 16px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="errorMessage" class="error-message">
+        This extension only works on Berkeley College Scheduler
+    </div>
+    <h3>cal.lendar</h3>
+    <select id="semesterSelect">
+        <option value="">Select Semester</option>
+    </select>
+    <button id="convert">Convert to ICS</button>
+    <script src="popup.js"></script>
+</body>
+</html>

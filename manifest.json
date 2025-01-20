@@ -1,0 +1,21 @@
+{
+    "manifest_version": 3,
+    "name": "cal.lendar",
+    "version": "1.0",
+    "description": "Convert Berkeley College Scheduler to ICS calendar format",
+    "permissions": ["activeTab", "scripting", "downloads"],
+    "host_permissions": [
+        "https://berkeley.collegescheduler.com/terms/*"
+    ],
+    "icons": {
+        "48": "icon.png"
+    },
+    "action": {
+        "default_popup": "popup.html",
+        "default_icon": "icon.png"
+    },
+    "content_scripts": [{
+        "matches": ["https://berkeley.collegescheduler.com/terms/*"],
+        "js": ["content.js"]
+    }]
+}
