@@ -58,7 +58,6 @@ function extractScheduleData() {
 }
 
 function generateICS(schedule, semesterInfo) {
-    // Validate semester info
     if (!semesterInfo || !semesterInfo.start || !semesterInfo.end) {
         console.error('Invalid semester info:', semesterInfo);
         throw new Error('Missing semester dates');
@@ -70,7 +69,6 @@ function generateICS(schedule, semesterInfo) {
         holidays: semesterInfo.holidays
     });
 
-    // ICS file header
     let icsContent = [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
@@ -79,9 +77,8 @@ function generateICS(schedule, semesterInfo) {
     ].join('\r\n') + '\r\n';
 
     function formatDateTime(date, timeStr) {
- 
         const [_, hours, minutes, period] = timeStr.match(/(\d+):(\d+)(am|pm)/i);
-     
+    
         let hour = parseInt(hours);
         if (period.toLowerCase() === 'pm' && hour !== 12) {
             hour += 12;
@@ -89,7 +86,6 @@ function generateICS(schedule, semesterInfo) {
             hour = 0;
         }
         
-        // Ensure hour is at least 8 (8am)
         if (hour < 8) {
             hour += 12;
         }
@@ -103,11 +99,21 @@ function generateICS(schedule, semesterInfo) {
         return `${year}${month}${day}T${formattedHours}${formattedMinutes}00`;
     }
 
-    // Get the dates for each day of the week in the semester
-    function getDatesForDay(dayName, startDate, endDate, holidays) {
-        const dates = [];
+    function getRecurrenceRule(dayName) {
+        const days = {
+            'Monday': 'MO',
+            'Tuesday': 'TU',
+            'Wednesday': 'WE',
+            'Thursday': 'TH',
+            'Friday': 'FR'
+        };
+        return `FREQ=WEEKLY;BYDAY=${days[dayName]}`;
+    }
+
+    function getExcludeDates(dayName, startDate, endDate, holidays) {
         const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const targetDay = days.indexOf(dayName);
+        const excludeDates = [];
         
         let currentDate = new Date(startDate + 'T00:00:00');
         const semesterEnd = new Date(endDate + 'T23:59:59');
@@ -117,44 +123,67 @@ function generateICS(schedule, semesterInfo) {
                 const dateStr = currentDate.toISOString().split('T')[0];
                 const isHoliday = holidays.some(holiday => holiday.date === dateStr);
                 
-                if (!isHoliday) {
-                    dates.push(new Date(currentDate));
+                if (isHoliday) {
+                    excludeDates.push(new Date(currentDate));
                 }
             }
             currentDate.setDate(currentDate.getDate() + 1);
         }
         
-        return dates;
+        return excludeDates;
+    }
+
+    function getFirstClassDate(startDate, dayName) {
+        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        const targetDay = days.indexOf(dayName);
+        const date = new Date(startDate + 'T00:00:00');
+        
+        // Adjust the date until we hit the right day of the week
+        while (date.getDay() !== targetDay) {
+            date.setDate(date.getDate() + 1);
+        }
+        
+        return date;
     }
 
     schedule.forEach(course => {
-        console.log(`Processing course: ${course.subject} ${course.courseNumber} on ${course.day}`);
-        console.log(`Times: ${course.startTime} - ${course.endTime}`);
-        
-        const classDates = getDatesForDay(
+        // Get the first actual date this class occurs
+        const firstClassDate = getFirstClassDate(semesterInfo.start, course.day);
+        const excludeDates = getExcludeDates(
             course.day,
             semesterInfo.start,
             semesterInfo.end,
             semesterInfo.holidays || []
         );
 
-        classDates.forEach(date => {
-            icsContent += [
-                'BEGIN:VEVENT',
-                `UID:${date.toISOString().split('.')[0].replace(/[-:]/g, '')}Z-${course.subject.replace(/\s+/g, '')}${course.courseNumber.replace(/\s+/g, '')}@berkeley.edu`,
-                `DTSTAMP:${new Date().toISOString().split('.')[0].replace(/[-:]/g, '')}Z`,
-                `DTSTART;TZID=America/Los_Angeles:${formatDateTime(date, course.startTime)}`,
-                `DTEND;TZID=America/Los_Angeles:${formatDateTime(date, course.endTime)}`,
-                `SUMMARY:${course.subject} ${course.courseNumber}`,
-                `LOCATION:${course.location}`,
-                'END:VEVENT'
-            ].join('\r\n') + '\r\n';
-        });
+        // Create event with recurrence
+        const eventLines = [
+            'BEGIN:VEVENT',
+            `UID:${course.subject.replace(/\s+/g, '')}${course.courseNumber.replace(/\s+/g, '')}-${course.day}@berkeley.edu`,
+            `DTSTAMP:${new Date().toISOString().split('.')[0].replace(/[-:]/g, '')}Z`,
+            `DTSTART;TZID=America/Los_Angeles:${formatDateTime(firstClassDate, course.startTime)}`,
+            `DTEND;TZID=America/Los_Angeles:${formatDateTime(firstClassDate, course.endTime)}`,
+            `RRULE:${getRecurrenceRule(course.day)};UNTIL=${semesterInfo.end.replace(/-/g, '')}T235959Z`
+        ];
+
+        // Add EXDATE for holidays
+        if (excludeDates.length > 0) {
+            const exdates = excludeDates
+                .map(date => formatDateTime(date, course.startTime))
+                .join(',');
+            eventLines.push(`EXDATE;TZID=America/Los_Angeles:${exdates}`);
+        }
+
+        eventLines.push(
+            `SUMMARY:${course.subject} ${course.courseNumber}`,
+            `LOCATION:${course.location}`,
+            'END:VEVENT'
+        );
+
+        icsContent += eventLines.join('\r\n') + '\r\n';
     });
 
-
     icsContent += 'END:VCALENDAR\r\n';
-
     return icsContent;
 }
 

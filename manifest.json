@@ -3,7 +3,7 @@
     "name": "cal.lendar",
     "version": "1.0",
     "description": "Convert Berkeley College Scheduler to ICS calendar format",
-    "permissions": ["activeTab", "scripting", "downloads"],
+    "permissions": ["activeTab"],
     "host_permissions": [
         "https://berkeley.collegescheduler.com/terms/*"
     ],
