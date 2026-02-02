@@ -18,37 +18,122 @@ function extractScheduleData() {
     
     console.log('Starting schedule extraction...');
     
+    // Get the header row to extract time information
+    const headerRow = document.querySelector('.css-1k99v3t-headerCss');
+    const dayHeaders = headerRow ? headerRow.querySelectorAll('.css-uegwnu-columnCss') : [];
+    
+    // Get all day columns
     const columns = document.querySelectorAll('.css-1hyowku-columnCss');
     console.log('Found columns:', columns.length);
     
     columns.forEach((column, dayIndex) => {
-        const buttons = column.querySelectorAll('[role="button"]');
-        console.log(`Day ${days[dayIndex]} has ${buttons.length} classes`);
+        if (dayIndex >= days.length) return;
         
-        buttons.forEach(class_ => {
-            const info = class_.getAttribute('aria-label');
-            console.log('Class info:', info);
-            
-            if (!info) return;
-
-            const match = info.match(/(.+?)-(\d+[^\s]+(?:\s+[^\s]+)?)\s+(?:br>)?\s+(.+?)\s+(\w+)\s+from\s+(\d+:\d+(?:am|pm))\s+to\s+(\d+:\d+(?:am|pm))/i);
-            if (match) {
-                // Split course number at the space if it exists
-                const fullCourseNumber = match[2].trim();
-                const courseNumber = fullCourseNumber.split(' ')[0];
-                
-                const classInfo = {
+        const day = days[dayIndex];
+        
+        // Get time info from the header's sr-only span for this day
+        let dayTimeInfo = '';
+        if (dayHeaders[dayIndex]) {
+            const srOnlySpan = dayHeaders[dayIndex].querySelector('.sr-only');
+            if (srOnlySpan) {
+                dayTimeInfo = srOnlySpan.textContent || '';
+            }
+        }
+        
+        // Parse all courses from the sr-only span first
+        // Format: "This day has Subject - CourseNumber COURSE_NAME from 8:00am to 8:59am Subject2 - CourseNumber2..."
+        const courseTimeEntries = [];
+        if (dayTimeInfo) {
+            // Match pattern: "Subject - CourseNumber [COURSE_NAME] from TIME to TIME"
+            // Match everything between course number and "from" (non-greedy)
+            const coursePattern = /([^-]+?)\s*-\s*(\d+[A-Z]?)\s+.*?\s+from\s+(\d+:\d+(?:am|pm))\s+to\s+(\d+:\d+(?:am|pm))/gi;
+            let match;
+            while ((match = coursePattern.exec(dayTimeInfo)) !== null) {
+                courseTimeEntries.push({
                     subject: match[1].trim(),
+                    courseNumber: match[2].trim(),
+                    startTime: match[3],
+                    endTime: match[4]
+                });
+            }
+        }
+        
+        // Find all course chips in this column
+        const courseChips = column.querySelectorAll('[class*="chipCss"]');
+        console.log(`Day ${day} has ${courseChips.length} classes`);
+        
+        // Track which time entries have been used to handle multiple sections of same course
+        const usedTimeEntryIndices = new Set();
+        
+        courseChips.forEach((chip, chipIndex) => {
+            // Extract course details from the detail div
+            const detailDiv = chip.querySelector('.css-14x2cgx-tabletDescrCss-descrCss');
+            if (!detailDiv) {
+                console.log('No detail div found for chip');
+                return;
+            }
+            
+            const detailLines = detailDiv.querySelectorAll('div');
+            
+            if (detailLines.length < 1) {
+                console.log('Insufficient detail lines');
+                return;
+            }
+            
+            // First line: "Public Health-142   Dwinelle 155"
+            const firstLine = detailLines[0].textContent.trim();
+            
+            // Parse subject, course number, and location from first line
+            // Format: "Subject-CourseNumber   Location" (with multiple spaces)
+            const firstLineMatch = firstLine.match(/^(.+?)-(\d+[A-Z]?)\s{2,}(.+)$/);
+            let subject, courseNumber, location;
+            if (!firstLineMatch) {
+                // Try alternative format with single space
+                const altMatch = firstLine.match(/^(.+?)-(\d+[A-Z]?)\s+(.+)$/);
+                if (!altMatch) {
+                    console.log('Could not parse first line:', firstLine);
+                    return;
+                }
+                subject = altMatch[1].trim();
+                courseNumber = altMatch[2].trim();
+                location = altMatch[3].trim();
+            } else {
+                subject = firstLineMatch[1].trim();
+                courseNumber = firstLineMatch[2].trim();
+                location = firstLineMatch[3].trim();
+            }
+            
+            // Find matching time entry from the parsed courseTimeEntries
+            // Match by subject and course number, and use first unused match to handle duplicates
+            let matchingEntry = null;
+            let matchingIndex = -1;
+            for (let i = 0; i < courseTimeEntries.length; i++) {
+                if (usedTimeEntryIndices.has(i)) continue;
+                const entry = courseTimeEntries[i];
+                if (entry.subject.toLowerCase() === subject.toLowerCase() && 
+                    entry.courseNumber === courseNumber) {
+                    matchingEntry = entry;
+                    matchingIndex = i;
+                    break;
+                }
+            }
+            
+            if (matchingEntry) {
+                usedTimeEntryIndices.add(matchingIndex);
+                const classInfo = {
+                    subject: subject,
                     courseNumber: courseNumber,
-                    location: match[3].trim(),
-                    day: days[dayIndex],
-                    startTime: match[5],
-                    endTime: match[6]
+                    location: location,
+                    day: day,
+                    startTime: matchingEntry.startTime,
+                    endTime: matchingEntry.endTime
                 };
                 console.log('Extracted class:', classInfo);
                 schedule.push(classInfo);
             } else {
-                console.log('No match found for:', info);
+                console.log('Could not find time for:', subject, courseNumber, 'in dayTimeInfo');
+                // If we can't find the time, we still add it but without time info
+                // This shouldn't happen, but it's a fallback
             }
         });
     });
