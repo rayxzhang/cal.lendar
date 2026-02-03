@@ -45,17 +45,21 @@ function extractScheduleData() {
         const courseTimeEntries = [];
         if (dayTimeInfo) {
             // Match pattern: "Subject - CourseNumber [COURSE_NAME] from TIME to TIME"
-            // Match everything between course number and "from" (non-greedy)
-            const coursePattern = /([^-]+?)\s*-\s*(\d+[A-Z]?)\s+.*?\s+from\s+(\d+:\d+(?:am|pm))\s+to\s+(\d+:\d+(?:am|pm))/gi;
+            // Use (.+?) to match the full subject (including dashes) until we hit " - " before course number
+            const coursePattern = /(.+?)\s*-\s*(\d+[A-Z]?)\s+.*?\s+from\s+(\d+:\d+(?:am|pm))\s+to\s+(\d+:\d+(?:am|pm))/gi;
             let match;
             while ((match = coursePattern.exec(dayTimeInfo)) !== null) {
-                courseTimeEntries.push({
+                const entry = {
                     subject: match[1].trim(),
                     courseNumber: match[2].trim(),
                     startTime: match[3],
                     endTime: match[4]
-                });
+                };
+                console.log(`Parsed time entry for ${day}:`, entry);
+                courseTimeEntries.push(entry);
             }
+        } else {
+            console.log(`No time info found for ${day}`);
         }
         
         // Find all course chips in this column
@@ -107,10 +111,20 @@ function extractScheduleData() {
             // Match by subject and course number, and use first unused match to handle duplicates
             let matchingEntry = null;
             let matchingIndex = -1;
+            
+            // Normalize subject names for comparison (remove extra spaces, handle dashes)
+            const normalizeSubject = (s) => s.toLowerCase().replace(/\s+/g, ' ').trim();
+            const normalizedSubject = normalizeSubject(subject);
+            
+            console.log(`Looking for match: subject="${subject}", courseNumber="${courseNumber}"`);
+            console.log(`Available time entries:`, courseTimeEntries.map(e => `${e.subject} ${e.courseNumber} (${e.startTime}-${e.endTime})`));
+            
             for (let i = 0; i < courseTimeEntries.length; i++) {
                 if (usedTimeEntryIndices.has(i)) continue;
                 const entry = courseTimeEntries[i];
-                if (entry.subject.toLowerCase() === subject.toLowerCase() && 
+                const normalizedEntrySubject = normalizeSubject(entry.subject);
+                
+                if (normalizedEntrySubject === normalizedSubject && 
                     entry.courseNumber === courseNumber) {
                     matchingEntry = entry;
                     matchingIndex = i;
@@ -132,6 +146,8 @@ function extractScheduleData() {
                 schedule.push(classInfo);
             } else {
                 console.log('Could not find time for:', subject, courseNumber, 'in dayTimeInfo');
+                console.log(`Normalized subject: "${normalizedSubject}"`);
+                console.log(`Available entries:`, courseTimeEntries.map(e => `"${normalizeSubject(e.subject)}" ${e.courseNumber}`));
                 // If we can't find the time, we still add it but without time info
                 // This shouldn't happen, but it's a fallback
             }
