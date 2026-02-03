@@ -46,7 +46,8 @@ function extractScheduleData() {
         if (dayTimeInfo) {
             // Match pattern: "Subject - CourseNumber [COURSE_NAME] from TIME to TIME"
             // Use (.+?) to match the full subject (including dashes) until we hit " - " before course number
-            const coursePattern = /(.+?)\s*-\s*(\d+[A-Z]?)\s+.*?\s+from\s+(\d+:\d+(?:am|pm))\s+to\s+(\d+:\d+(?:am|pm))/gi;
+            // Course number can be like "142", "153B", or "192PF" (digits followed by optional letters)
+            const coursePattern = /(.+?)\s*-\s*(\d+[A-Z]*)\s+.*?\s+from\s+(\d+:\d+(?:am|pm))\s+to\s+(\d+:\d+(?:am|pm))/gi;
             let match;
             while ((match = coursePattern.exec(dayTimeInfo)) !== null) {
                 const entry = {
@@ -84,16 +85,17 @@ function extractScheduleData() {
                 return;
             }
             
-            // First line: "Public Health-142   Dwinelle 155"
+            // First line: "Public Health-142   Dwinelle 155" or "Business Admin-Undergrad-192PF   Internet/Online"
             const firstLine = detailLines[0].textContent.trim();
             
             // Parse subject, course number, and location from first line
             // Format: "Subject-CourseNumber   Location" (with multiple spaces)
-            const firstLineMatch = firstLine.match(/^(.+?)-(\d+[A-Z]?)\s{2,}(.+)$/);
+            // Course number can be like "142", "153B", or "192PF" (digits followed by optional letters)
+            const firstLineMatch = firstLine.match(/^(.+?)-(\d+[A-Z]*)\s{2,}(.+)$/);
             let subject, courseNumber, location;
             if (!firstLineMatch) {
                 // Try alternative format with single space
-                const altMatch = firstLine.match(/^(.+?)-(\d+[A-Z]?)\s+(.+)$/);
+                const altMatch = firstLine.match(/^(.+?)-(\d+[A-Z]*)\s+(.+)$/);
                 if (!altMatch) {
                     console.log('Could not parse first line:', firstLine);
                     return;
